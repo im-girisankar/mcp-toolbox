@@ -1,0 +1,62 @@
+diff --git a/tests/test_repo_search.py b/tests/test_repo_search.py
+new file mode 100644
+index 0000000..1bbe505
+--- /dev/null
++++ b/tests/test_repo_search.py
+@@ -0,0 +1,56 @@
++from mcp_toolbox import list_tools
++from mcp_toolbox.tools.repo_search import repo_search
++
++
++def test_finds_keyword_in_py_file(tmp_path):
++    f = tmp_path / "sample.py"
++    f.write_text("def hello_world():\n    pass\n")
++    results = repo_search(str(tmp_path), "hello_world")
++    assert len(results) == 1
++    assert results[0]["line_no"] == 1
++    assert "hello_world" in results[0]["line"]
++
++
++def test_returns_file_path(tmp_path):
++    f = tmp_path / "module.py"
++    f.write_text("CONSTANT = 42\n")
++    results = repo_search(str(tmp_path), "CONSTANT")
++    assert results[0]["file"] == str(f)
++
++
++def test_respects_file_pattern(tmp_path):
++    (tmp_path / "a.py").write_text("keyword here\n")
++    (tmp_path / "b.txt").write_text("keyword here\n")
++    results = repo_search(str(tmp_path), "keyword", file_pattern="*.py")
++    assert len(results) == 1
++    assert results[0]["file"].endswith("a.py")
++
++
++def test_no_matches_returns_empty(tmp_path):
++    (tmp_path / "c.py").write_text("nothing interesting\n")
++    results = repo_search(str(tmp_path), "TOTALLY_ABSENT_XYZ")
++    assert results == []
++
++
++def test_multiple_matches_in_file(tmp_path):
++    content = "foo = 1\nfoo = 2\nbar = 3\n"
++    (tmp_path / "multi.py").write_text(content)
++    results = repo_search(str(tmp_path), "foo")
++    assert len(results) == 2
++
++
++def test_case_insensitive_search(tmp_path):
++    (tmp_path / "case.py").write_text("Hello World\n")
++    results = repo_search(str(tmp_path), "hello world")
++    assert len(results) == 1
++
++
++def test_registry_has_repo_search():
++    tools = list_tools()
++    assert "repo_search" in tools
++
++
++def test_result_has_required_keys(tmp_path):
++    (tmp_path / "keys.py").write_text("target line\n")
++    results = repo_search(str(tmp_path), "target")
++    assert all("file" in r and "line_no" in r and "line" in r for r in results)

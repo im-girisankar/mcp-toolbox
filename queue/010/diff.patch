@@ -1,0 +1,32 @@
+diff --git a/src/mcp_toolbox/tools/repo_search.py b/src/mcp_toolbox/tools/repo_search.py
+new file mode 100644
+index 0000000..462516b
+--- /dev/null
++++ b/src/mcp_toolbox/tools/repo_search.py
+@@ -0,0 +1,26 @@
++from __future__ import annotations
++
++import fnmatch
++import re
++from pathlib import Path
++
++from mcp_toolbox.registry import register
++
++
++@register("repo_search")
++def repo_search(directory: str, keyword: str, file_pattern: str = "*.py") -> list[dict]:
++    """Keyword/pattern search over files in a directory. Returns [{file, line_no, line}]."""
++    results: list[dict] = []
++    root = Path(directory)
++    pattern = re.compile(re.escape(keyword), re.IGNORECASE)
++    for path in root.rglob("*"):
++        if path.is_file() and fnmatch.fnmatch(path.name, file_pattern):
++            try:
++                for lineno, line in enumerate(
++                    path.read_text(encoding="utf-8", errors="replace").splitlines(), 1
++                ):
++                    if pattern.search(line):
++                        results.append({"file": str(path), "line_no": lineno, "line": line.rstrip()})
++            except OSError:
++                continue
++    return results

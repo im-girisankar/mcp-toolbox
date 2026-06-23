@@ -1,0 +1,39 @@
+diff --git a/src/mcp_toolbox/server.py b/src/mcp_toolbox/server.py
+new file mode 100644
+index 0000000..766a91f
+--- /dev/null
++++ b/src/mcp_toolbox/server.py
+@@ -0,0 +1,33 @@
++from __future__ import annotations
++
++
++def serve(config=None):
++    """Start the MCP stdio server.
++
++    Lazy-imports the ``mcp`` package so that importing this module does NOT
++    require ``mcp`` to be installed.  If ``mcp`` is absent the caller gets a
++    clear error pointing at the ``[server]`` extra.
++
++    All tools registered in the tool registry are exposed automatically.
++    The server runs over stdio (the transport expected by Claude Desktop and
++    the MCP spec).
++    """
++    try:
++        from mcp.server.fastmcp import FastMCP  # type: ignore[import-untyped]
++    except ImportError as e:
++        raise ImportError(
++            "The MCP SDK is not installed.  "
++            "Run: pip install 'mcp-toolbox[server]'"
++        ) from e
++
++    import mcp_toolbox.tools  # noqa: F401 â€” side-effect: registers all tools
++    from mcp_toolbox.registry import registry
++
++    mcp_server = FastMCP("mcp-toolbox")
++
++    for tool_name, fn in registry.items():
++        # FastMCP.tool() can decorate an existing callable directly when called
++        # with the function as the first positional argument and a name kwarg.
++        mcp_server.tool(name=tool_name)(fn)
++
++    mcp_server.run(transport="stdio")

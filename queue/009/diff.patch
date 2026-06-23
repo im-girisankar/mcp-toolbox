@@ -1,0 +1,69 @@
+diff --git a/src/mcp_toolbox/tools/reliability_score.py b/src/mcp_toolbox/tools/reliability_score.py
+new file mode 100644
+index 0000000..2a7da4f
+--- /dev/null
++++ b/src/mcp_toolbox/tools/reliability_score.py
+@@ -0,0 +1,63 @@
++from __future__ import annotations
++
++import re
++
++from mcp_toolbox.registry import register
++
++
++def _word_set(text: str) -> set[str]:
++    return set(re.findall(r"\b\w+\b", text.lower()))
++
++
++def _capitalized_entities(text: str) -> set[str]:
++    return set(re.findall(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b", text))
++
++
++@register("reliability_score")
++def reliability_score(answer: str, context: str) -> dict:
++    """Heuristic faithfulness/consistency score. Returns {score: float 0-1, details: dict}."""
++    if not answer or not context:
++        return {
++            "score": 0.0,
++            "details": {"keyword_overlap": 0.0, "entity_coverage": None, "length_ratio": None},
++        }
++
++    ans_words = _word_set(answer)
++    ctx_words = _word_set(context)
++    union = ans_words | ctx_words
++    intersection = ans_words & ctx_words
++    keyword_overlap = len(intersection) / len(union) if union else 0.0
++
++    ctx_entities = _capitalized_entities(context)
++    ans_entities = _capitalized_entities(answer)
++    if ctx_entities:
++        entity_coverage: float | None = len(ans_entities & ctx_entities) / len(ctx_entities)
++    else:
++        # No named entities in context â€” cannot measure coverage; exclude this
++        # component from the weighted average rather than awarding a free 1.0.
++        entity_coverage = None
++
++    # length_ratio is dropped: it rewards sheer length and lets a long,
++    # completely unrelated answer inflate the score even when there is only
++    # incidental stop-word overlap.  The two remaining components (keyword
++    # overlap and entity coverage) are sufficient for a heuristic signal.
++
++    # Build a weighted average over whichever components are active.
++    # Base weights: keyword_overlap=0.5, entity_coverage=0.3 (length_ratio removed).
++    # When entity_coverage is excluded (no named entities in context) its weight
++    # is redistributed to keyword_overlap rather than awarding a free 1.0.
++    if entity_coverage is not None:
++        # Normalise: 0.5 + 0.3 = 0.8 â†’ scale to 1.0
++        score = (0.5 / 0.8) * keyword_overlap + (0.3 / 0.8) * entity_coverage
++    else:
++        # Only keyword_overlap available.
++        score = keyword_overlap
++
++    return {
++        "score": round(score, 4),
++        "details": {
++            "keyword_overlap": round(keyword_overlap, 4),
++            "entity_coverage": round(entity_coverage, 4) if entity_coverage is not None else None,
++            "length_ratio": None,
++        },
++    }

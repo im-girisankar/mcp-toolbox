@@ -1,0 +1,47 @@
+diff --git a/tests/test_cli.py b/tests/test_cli.py
+new file mode 100644
+index 0000000..a51eea5
+--- /dev/null
++++ b/tests/test_cli.py
+@@ -0,0 +1,41 @@
++import json
++import sys
++
++from mcp_toolbox.cli import main
++
++
++def run_cli(args: list[str], capsys: object) -> tuple[str, str]:
++    sys.argv = ["mcptb"] + args
++    try:
++        main()
++    except SystemExit:
++        pass
++    return capsys.readouterr()
++
++
++def test_list_shows_tools(capsys):
++    out, _ = run_cli(["list"], capsys)
++    assert "repo_search" in out
++    assert "reliability_score" in out
++    assert "redteam_scan" in out
++
++
++def test_dump_is_valid_json(capsys):
++    out, _ = run_cli(["dump"], capsys)
++    data = json.loads(out)
++    assert isinstance(data, dict)
++    assert "repo_search" in data
++
++
++def test_dump_has_docstrings(capsys):
++    out, _ = run_cli(["dump"], capsys)
++    data = json.loads(out)
++    assert len(data["repo_search"]) > 0
++
++
++def test_no_subcommand_exits_cleanly(capsys):
++    sys.argv = ["mcptb"]
++    try:
++        main()
++    except SystemExit as e:
++        assert e.code == 0

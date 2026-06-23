@@ -1,0 +1,63 @@
+diff --git a/src/mcp_toolbox/tools/redteam_scan.py b/src/mcp_toolbox/tools/redteam_scan.py
+new file mode 100644
+index 0000000..42f10eb
+--- /dev/null
++++ b/src/mcp_toolbox/tools/redteam_scan.py
+@@ -0,0 +1,57 @@
++from __future__ import annotations
++
++import base64
++import re
++
++from mcp_toolbox.registry import register
++
++_INJECTION_PATTERNS = [
++    r"ignore\s+(previous|prior|all)\s+instructions?",
++    r"you\s+are\s+now\s+(?:a|an|the)\s+",
++    r"\bDAN\b",
++    r"jailbreak",
++    r"system\s+prompt",
++    r"act\s+as\s+(?:a|an|the)\s+",
++    r"pretend\s+(?:you\s+are|to\s+be)",
++    r"disregard\s+(?:your|all)\s+(?:previous\s+)?(?:instructions?|guidelines?|rules?)",
++    r"bypass\s+(?:your\s+)?(?:safety|filter|restriction)",
++    r"override\s+(?:your\s+)?(?:previous\s+)?(?:instructions?|settings?)",
++    r"new\s+persona",
++    r"from\s+now\s+on\s+you",
++    r"forget\s+(?:everything|all)\s+(?:you\s+(?:were|have\s+been)\s+told|previous)",
++]
++
++_COMPILED = [re.compile(p, re.IGNORECASE) for p in _INJECTION_PATTERNS]
++
++
++def _has_suspicious_base64(text: str) -> bool:
++    b64_candidates = re.findall(r"[A-Za-z0-9+/]{20,}={0,2}", text)
++    for candidate in b64_candidates:
++        try:
++            decoded = base64.b64decode(candidate + "==").decode("utf-8", errors="ignore")
++            if any(p.search(decoded) for p in _COMPILED):
++                return True
++        except Exception:  # noqa: BLE001
++            continue
++    return False
++
++
++@register("redteam_scan")
++def redteam_scan(text: str) -> dict:
++    """Scan text for prompt injection/jailbreak markers. Returns {risk_level, flags, score}."""
++    flags: list[str] = []
++    for i, pattern in enumerate(_COMPILED):
++        if pattern.search(text):
++            flags.append(_INJECTION_PATTERNS[i])
++    if _has_suspicious_base64(text):
++        flags.append("base64_encoded_instruction")
++
++    score = min(1.0, len(flags) * 0.25)
++    if score == 0.0:
++        risk_level = "low"
++    elif score <= 0.5:
++        risk_level = "medium"
++    else:
++        risk_level = "high"
++
++    return {"risk_level": risk_level, "flags": flags, "score": round(score, 4)}

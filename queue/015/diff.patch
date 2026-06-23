@@ -1,0 +1,88 @@
+diff --git a/tests/test_reliability.py b/tests/test_reliability.py
+new file mode 100644
+index 0000000..5952293
+--- /dev/null
++++ b/tests/test_reliability.py
+@@ -0,0 +1,82 @@
++from mcp_toolbox.tools.reliability_score import reliability_score
++
++
++def test_identical_text_high_score():
++    text = "The quick brown fox jumps over the lazy dog"
++    result = reliability_score(text, text)
++    assert result["score"] > 0.8
++
++
++def test_unrelated_text_low_score():
++    result = reliability_score("cats like fish", "quantum computing algorithms")
++    assert result["score"] < 0.5
++
++
++def test_empty_answer_returns_zero():
++    result = reliability_score("", "some context here")
++    assert result["score"] == 0.0
++
++
++def test_empty_context_returns_zero():
++    result = reliability_score("some answer", "")
++    assert result["score"] == 0.0
++
++
++def test_result_has_required_keys():
++    result = reliability_score("answer text", "context text")
++    assert "score" in result
++    assert "details" in result
++    assert "keyword_overlap" in result["details"]
++
++
++def test_score_between_zero_and_one():
++    result = reliability_score("partial overlap with context words", "context words and more")
++    assert 0.0 <= result["score"] <= 1.0
++
++
++def test_entity_coverage_in_details():
++    result = reliability_score("Paris is great", "Paris is the capital of France")
++    assert "entity_coverage" in result["details"]
++
++
++# --- regression tests for scoring fixes ---
++
++
++def test_unrelated_answer_scores_very_low():
++    """Completely unrelated answer vs context must score < 0.2.
++
++    Regression for the bug where entity_coverage defaulted to 1.0 when the
++    context had no named entities (inflating the score), and where length_ratio
++    alone could push an unrelated answer into mid-range territory.
++    """
++    answer = "bananas grow in tropical climates and are yellow when ripe"
++    context = "the speed of light in a vacuum is approximately 299792458 metres per second"
++    result = reliability_score(answer, context)
++    assert result["score"] < 0.2, (
++        f"Expected score < 0.2 for clearly unrelated text, got {result['score']} "
++        f"(details: {result['details']})"
++    )
++
++
++def test_no_ctx_entities_excluded_not_awarded():
++    """When context has no named entities, entity_coverage must be None (excluded).
++
++    Previously it was awarded 1.0, which inflated scores for unrelated text.
++    """
++    result = reliability_score("some answer text", "context with no proper nouns at all")
++    assert result["details"]["entity_coverage"] is None
++
++
++def test_length_ratio_dropped_from_score():
++    """length_ratio is removed; details[length_ratio] must be None.
++
++    length_ratio was dropped because it allowed long, wholly off-topic answers
++    to inflate the score purely through length similarity to the context.
++    Verifies the component is absent from the computation (None sentinel) and
++    that a fully unrelated pair scores 0.0.
++    """
++    answer = "zebras stripes patterns evolution predator confusion camouflage"
++    context = "nuclear fusion plasma confinement tokamak magnetic field"
++    result = reliability_score(answer, context)
++    assert result["details"]["length_ratio"] is None
++    assert result["score"] == 0.0

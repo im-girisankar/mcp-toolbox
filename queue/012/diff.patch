@@ -1,0 +1,42 @@
+diff --git a/tests/test_config.py b/tests/test_config.py
+new file mode 100644
+index 0000000..0b45fa4
+--- /dev/null
++++ b/tests/test_config.py
+@@ -0,0 +1,36 @@
++import pytest
++
++from mcp_toolbox.config import ToolboxConfig, load_config
++
++
++def test_defaults_when_no_path():
++    config = load_config()
++    assert isinstance(config, ToolboxConfig)
++    assert config.host == "0.0.0.0"
++    assert config.port == 8000
++    assert config.enabled_tools == []
++
++
++def test_yaml_host_and_port(tmp_path):
++    pytest.importorskip("yaml")
++    config_file = tmp_path / "config.yaml"
++    config_file.write_text("host: 127.0.0.1\nport: 9000\n")
++    config = load_config(str(config_file))
++    assert config.host == "127.0.0.1"
++    assert config.port == 9000
++
++
++def test_yaml_enabled_tools(tmp_path):
++    pytest.importorskip("yaml")
++    config_file = tmp_path / "config.yaml"
++    config_file.write_text("enabled_tools:\n  - repo_search\n  - redteam_scan\n")
++    config = load_config(str(config_file))
++    assert "repo_search" in config.enabled_tools
++
++
++def test_empty_yaml_returns_defaults(tmp_path):
++    pytest.importorskip("yaml")
++    config_file = tmp_path / "empty.yaml"
++    config_file.write_text("")
++    config = load_config(str(config_file))
++    assert config.host == "0.0.0.0"

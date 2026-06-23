@@ -1,0 +1,11 @@
+diff --git a/src/mcp_toolbox/tools/__init__.py b/src/mcp_toolbox/tools/__init__.py
+new file mode 100644
+index 0000000..014348a
+--- /dev/null
++++ b/src/mcp_toolbox/tools/__init__.py
+@@ -0,0 +1,5 @@
++from mcp_toolbox.tools import (
++    redteam_scan,  # noqa: F401
++    reliability_score,  # noqa: F401
++    repo_search,  # noqa: F401
++)

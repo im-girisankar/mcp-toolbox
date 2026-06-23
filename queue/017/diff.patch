@@ -1,0 +1,63 @@
+diff --git a/tests/test_server.py b/tests/test_server.py
+new file mode 100644
+index 0000000..e005d4f
+--- /dev/null
++++ b/tests/test_server.py
+@@ -0,0 +1,57 @@
++"""Tests for server.py â€” no mcp SDK required for these tests."""
++from __future__ import annotations
++
++import sys
++
++import pytest
++
++
++def test_serve_raises_import_error_without_mcp(monkeypatch):
++    """serve() must raise ImportError with install hint when mcp is not installed.
++
++    This test patches sys.modules so that 'mcp' appears absent, then verifies
++    that serve() raises ImportError with the expected install instructions.
++    No real mcp package needs to be installed for this test to run.
++    """
++    # Remove any cached mcp sub-modules from sys.modules so the lazy import
++    # triggers a real ImportError.
++    mcp_keys = [k for k in sys.modules if k == "mcp" or k.startswith("mcp.")]
++    saved = {k: sys.modules.pop(k) for k in mcp_keys}
++
++    # Force 'mcp' to be absent by inserting a sentinel that raises ImportError.
++    monkeypatch.setitem(sys.modules, "mcp", None)  # None => ImportError on import
++
++    # Re-import server module with mcp absent (force reload so the lazy import runs fresh).
++    if "mcp_toolbox.server" in sys.modules:
++        del sys.modules["mcp_toolbox.server"]
++
++    try:
++        from mcp_toolbox import server
++
++        with pytest.raises(ImportError, match=r"pip install.*mcp-toolbox\[server\]"):
++            server.serve()
++    finally:
++        # Restore original mcp entries so other tests are unaffected.
++        monkeypatch.delitem(sys.modules, "mcp", raising=False)
++        sys.modules.update(saved)
++        # Force server module re-import next time so it picks up real mcp if present.
++        sys.modules.pop("mcp_toolbox.server", None)
++
++
++def test_importing_server_module_does_not_require_mcp(monkeypatch):
++    """Importing server.py must not import mcp at module load time.
++
++    The lazy-import guarantee: users who only call 'mcptb list' should not
++    need the mcp SDK installed.
++    """
++    mcp_keys = [k for k in sys.modules if k == "mcp" or k.startswith("mcp.")]
++    saved = {k: sys.modules.pop(k) for k in mcp_keys}
++    monkeypatch.setitem(sys.modules, "mcp", None)
++
++    sys.modules.pop("mcp_toolbox.server", None)
++    try:
++        import mcp_toolbox.server  # noqa: F401 â€” should not raise
++    finally:
++        monkeypatch.delitem(sys.modules, "mcp", raising=False)
++        sys.modules.update(saved)
++        sys.modules.pop("mcp_toolbox.server", None)
