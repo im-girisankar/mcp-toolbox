@@ -1,0 +1,60 @@
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+
+
+def cmd_list(args: argparse.Namespace) -> None:  # noqa: ARG001
+    import mcp_toolbox  # noqa: F401 â€” triggers registration
+    from mcp_toolbox import list_tools
+
+    for name in sorted(list_tools()):
+        print(name)
+
+
+def cmd_dump(args: argparse.Namespace) -> None:  # noqa: ARG001
+    import mcp_toolbox  # noqa: F401
+    from mcp_toolbox import registry
+
+    manifest = {name: (fn.__doc__ or "").strip() for name, fn in registry.items()}
+    print(json.dumps(manifest, indent=2))
+
+
+def cmd_serve(args: argparse.Namespace) -> None:
+    from mcp_toolbox import server
+    from mcp_toolbox.config import load_config
+
+    config = load_config(args.config)
+    if args.host:
+        config.host = args.host
+    if args.port:
+        config.port = args.port
+    server.serve(config)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(prog="mcptb", description="MCP Toolbox CLI")
+    sub = parser.add_subparsers(dest="command")
+
+    serve_p = sub.add_parser("serve", help="Start MCP server")
+    serve_p.add_argument("--config", default=None, help="Path to YAML config")
+    serve_p.add_argument("--host", default=None)
+    serve_p.add_argument("--port", type=int, default=None)
+    serve_p.set_defaults(func=cmd_serve)
+
+    list_p = sub.add_parser("list", help="List registered tools")
+    list_p.set_defaults(func=cmd_list)
+
+    dump_p = sub.add_parser("dump", help="Dump tools manifest as JSON")
+    dump_p.set_defaults(func=cmd_dump)
+
+    args = parser.parse_args()
+    if args.command is None:
+        parser.print_help()
+        sys.exit(0)
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()
